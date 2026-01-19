@@ -37,179 +37,7 @@ public class TextRenderStrategy : IRenderStrategy
             context.AddInline(run);
         }
     }
-    private bool IsInsideQuote(UbbNode node)
-    {
-        var current = node.Parent;
-        while (current != null)
-        {
-            if (current.Type == UbbNodeType.Quote)
-            {
-                return true;
-            }
-            current = current.Parent;
-        }
-        return false;
-    }
-    private bool IsOnlyNewLine(string text)
-    {
-        return text == "\r" || text == "\n" || text == "\r\n" ||
-               text == "\r\n\r\n" || text == "\n\n"; // 多个换行符
-    }
-    private void HandleNewLineOnlyContent(UbbNode node, RenderContext context)
-    {
-        // 获取父节点类型
-        var parentType = node.Parent?.Type;
-
-        // 规则1：在段落内的换行符 -> 转换为LineBreak
-        if (parentType == UbbNodeType.Paragraph)
-        {
-            // 添加LineBreak节点
-            var lineBreak = TagNode.Create(UbbNodeType.LineBreak);
-            context.RenderNode(lineBreak);
-            return;
-        }
-
-        // 规则2：在引用块、代码块等内部的换行符 -> 创建换行
-        if (IsInsideBlockContainer(node))
-        {
-            // 块级容器内的换行符应该换行
-            var lineBreak = TagNode.Create(UbbNodeType.LineBreak);
-            context.RenderNode(lineBreak);
-            return;
-        }
-
-        // 规则3：在文档根节点下的单独换行符 -> 忽略或小间距
-        if (parentType == UbbNodeType.Document)
-        {
-            // 文档根节点下的单独换行符，忽略或添加很小的间距
-            // 这取决于你想要的视觉效果
-            context.FinalizeCurrentTextBlock(); // 结束当前文本块
-                                                // 可选：添加一个小的分隔符
-                                                // context.AddToContainer(new TextBlock { Height = 2 });
-            return;
-        }
-
-        // 默认：转换为LineBreak
-        var defaultLineBreak = TagNode.Create(UbbNodeType.LineBreak);
-        context.RenderNode(defaultLineBreak);
-    }
-
-    private void HandleTextWithNewLines(string content, UbbNode node, RenderContext context)
-    {
-        Debug.WriteLine($"Handling text with new lines: \"{content}\"");
-        // 分割文本
-        var lines = SplitTextWithNewLines(content);
-
-        for (int i = 0; i < lines.Count; i++)
-        {
-            var lineText = lines[i].text;
-            var hasNewLine = lines[i].hasNewLine;
-
-            // 添加文本
-            if (!string.IsNullOrEmpty(lineText))
-            {
-                var run = new Run { Text = lineText };
-                context.AddInline(run);
-            }
-
-            // 添加换行
-            if (hasNewLine && i < lines.Count - 1)
-            {
-                // 根据上下文决定如何换行
-                if (ShouldCreateLineBreakInContext(node))
-                {
-                    // 创建LineBreak节点
-                    var lineBreak = TagNode.Create(UbbNodeType.LineBreak);
-                    context.RenderNode(lineBreak);
-                }
-                else
-                {
-                    // 在非段落上下文中，可能需要结束当前文本块
-                    context.FinalizeCurrentTextBlock();
-                }
-            }
-        }
-    }
-
-    private List<(string text, bool hasNewLine)> SplitTextWithNewLines(string text)
-    {
-        var result = new List<(string, bool)>();
-        var currentLine = new StringBuilder();
-
-        for (int i = 0; i < text.Length; i++)
-        {
-            char c = text[i];
-
-            if (c == '\r' || c == '\n')
-            {
-                // 保存当前行
-                result.Add((currentLine.ToString(), true));
-                currentLine.Clear();
-
-                // 跳过 \r\n 组合
-                if (i + 1 < text.Length && c == '\r' && text[i + 1] == '\n')
-                {
-                    i++;
-                }
-            }
-            else
-            {
-                currentLine.Append(c);
-            }
-        }
-
-        // 添加最后一行
-        if (currentLine.Length > 0)
-        {
-            result.Add((currentLine.ToString(), false));
-        }
-        // 处理以换行符结尾的情况
-        else if (text.Length > 0 && (text[^1] == '\r' || text[^1] == '\n'))
-        {
-            result.Add(("", false));
-        }
-
-        return result;
-    }
-
-    private bool IsInsideBlockContainer(UbbNode node)
-    {
-        // 检查节点是否在块级容器内
-        var current = node.Parent;
-        while (current != null)
-        {
-            if (IsBlockContainer(current.Type))
-            {
-                return true;
-            }
-            current = current.Parent;
-        }
-        return false;
-    }
-
-    private bool IsBlockContainer(UbbNodeType type)
-    {
-        return type == UbbNodeType.Quote ||
-               type == UbbNodeType.Code ||
-               type == UbbNodeType.List;
-    }
-
-    private bool ShouldCreateLineBreakInContext(UbbNode node)
-    {
-        // 检查当前上下文是否应该创建LineBreak
-        var parent = node.Parent;
-
-        // 在段落内 -> 创建LineBreak
-        if (parent?.Type == UbbNodeType.Paragraph)
-            return true;
-
-        // 在引用块内 -> 创建LineBreak
-        if (IsInsideBlockContainer(node))
-            return true;
-
-        // 其他情况 -> 不创建LineBreak
-        return false;
-    }
+    
 }
 
 // 粗体渲染策略
@@ -824,7 +652,11 @@ public class LineBreakRenderStrategy : IRenderStrategy
         public bool AfterBlockClose { get; set; } // 是否在块级标签关闭后
         public int ConsecutiveLineBreaks { get; set; } // 连续换行符数量
     }
-
+    /// <summary>
+    /// 换行处理逻辑的统一入口点
+    /// </summary>
+    /// <param name="node"></param>
+    /// <returns></returns>
     private LineBreakContext AnalyzeContext(UbbNode node)
     {
         var context = new LineBreakContext();
@@ -1151,7 +983,8 @@ public class EmojiRenderStrategy : IRenderStrategy
                         var image = new Image
                         {
                             Source = LoadImageFromUrl(imageUrl),
-                            MaxWidth=32,
+                            Margin = new Thickness(4, 0, 4, 0),
+                            MaxWidth =32,
                             MaxHeight=32,
                             Stretch=Stretch.UniformToFill
                         };

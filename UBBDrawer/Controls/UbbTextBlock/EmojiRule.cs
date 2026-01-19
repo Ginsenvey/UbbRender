@@ -6,7 +6,9 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace UbbRender.Common;
-// 表情规则配置
+/// <summary>
+/// 对于其他使用UBB的论坛，修改或添加表情规则请在此处进行。
+/// </summary>
 public class EmoticonRule
 {
     public Regex Pattern { get; set; }

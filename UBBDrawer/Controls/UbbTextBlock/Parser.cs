@@ -247,13 +247,6 @@ public class Parser
 
     private void ProcessNewLineToken(Token token)
     {
-        // 检查是否需要过滤这个换行符
-        if (ShouldFilterNewLineInParser())
-        {
-            // 过滤掉：不创建 LineBreak 节点
-            return;
-        }
-
         // 创建 LineBreak 节点
         var lineBreak = TagNode.Create(UbbNodeType.LineBreak);
 
@@ -268,91 +261,6 @@ public class Parser
         }
         _document.AllNodes.Add(lineBreak);
     }
-
-    private bool ShouldFilterNewLineInParser()
-    {
-        // 规则1：如果栈为空（文档根节点），不过滤
-        if (_nodeStack.Count == 0)
-            return false;
-
-        var currentNode = _nodeStack.Peek();
-
-        // 规则2：在块级容器内（如引用、代码块）
-        if (IsBlockContainer(currentNode))
-        {
-            // 检查这个换行符是否在"边界位置"
-            return IsBoundaryNewLineInContainer(currentNode);
-        }
-
-        return false;
-    }
-
-    private bool IsBoundaryNewLineInContainer(TagNode container)
-    {
-        var children = container.Children;
-
-        // 情况A：换行符是容器的第一个子节点
-        if (children.Count == 0)
-        {
-            // 即将添加的第一个子节点是换行符 → 过滤
-            return true;
-        }
-
-        // 情况B：换行符紧跟在块级标签之后
-        var lastChild = children[^1];
-        if (IsBlockTag(lastChild))
-        {
-            // 例如：[quote] 或 [/quote] 后的换行符
-            return true;
-        }
-
-        // 情况C：换行符前面已经是换行符（连续换行）
-        if (lastChild.Type == UbbNodeType.LineBreak)
-        {
-            // 避免多个连续换行，除了用于段落分隔的情况
-            return true;
-        }
-
-        // 情况D：检查是否在引用开始后的第一个内容前
-        if (container.Type == UbbNodeType.Quote)
-        {
-            // 查找引用内的第一个非换行内容
-            bool foundNonLineBreak = false;
-            foreach (var child in children)
-            {
-                if (child.Type != UbbNodeType.LineBreak)
-                {
-                    foundNonLineBreak = true;
-                    break;
-                }
-            }
-
-            // 如果还没有非换行内容，且现在要添加换行符 → 过滤
-            if (!foundNonLineBreak && children.Count > 0)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private bool IsBlockContainer(TagNode node)
-    {
-        return node.Type == UbbNodeType.Quote ||
-               node.Type == UbbNodeType.Code ||
-               node.Type == UbbNodeType.List;
-    }
-
-    private bool IsBlockTag(UbbNode node)
-    {
-        // 检查节点是否是块级标签的开始或结束
-        return node.Type == UbbNodeType.Quote ||
-               node.Type == UbbNodeType.Code ||
-               node.Type == UbbNodeType.List ||
-               node.Type == UbbNodeType.Paragraph;
-    }
-
 
 
     private TagNode CreateTagNode(TagInfo tagInfo)
@@ -413,7 +321,11 @@ public class Parser
         var node = TagNode.Create(nodeType, attributes);
         return node;
     }
-
+    /// <summary>
+    /// 从标签名获取节点类型
+    /// </summary>
+    /// <param name="tagName"></param>
+    /// <returns></returns>
     private UbbNodeType GetNodeTypeFromTagName(string tagName)
     {
         if (IsEmoticonTag(tagName))
