@@ -54,7 +54,8 @@ public enum UbbNodeType
     Paragraph,     // 段落（自动生成）
     LineBreak,      // 换行
     Divider,        // 分隔线 [hr]
-    Emoji          // 表情 [em]
+    Emoji,          // 表情 [em]
+    Latex           // 公式
 
 }
 

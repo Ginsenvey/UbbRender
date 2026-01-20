@@ -354,6 +354,7 @@ public class Parser
             "p" => UbbNodeType.Paragraph,
             "br" => UbbNodeType.LineBreak,
             "line" => UbbNodeType.Divider,
+            "math"=>UbbNodeType.Latex,
             _ => UbbNodeType.Text // 未知标签作为文本处理
         };
     }

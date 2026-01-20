@@ -152,7 +152,8 @@ namespace UbbRender.Render
                 //[UbbNodeType.ListItem] = new ListItemRenderStrategy(),
                 [UbbNodeType.Paragraph] = new ParagraphRenderStrategy(),
                 [UbbNodeType.LineBreak] = new LineBreakRenderStrategy(),
-                [UbbNodeType.Emoji]=new EmojiRenderStrategy()
+                [UbbNodeType.Emoji]=new EmojiRenderStrategy(),
+                [UbbNodeType.Latex]=new LatexRenderStrategy(),
             };
         }
 
