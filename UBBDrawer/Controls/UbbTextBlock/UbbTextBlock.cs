@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Windows.UI;
 using Microsoft.UI.Xaml.Media.Imaging;
+using UBBParser.Parser;
 using UbbRender.Common;
 namespace UbbRender.Render
 {

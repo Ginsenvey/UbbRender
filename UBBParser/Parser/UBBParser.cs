@@ -4,13 +4,13 @@ namespace UBBParser.Parser;
 
 public class UBBParser
 {
-    private readonly List<Token> _tokens;
+    private readonly IReadOnlyList<Token> _tokens;
     private int _index = 0;
     private readonly List<UbbNode> _allNodes = new();
 
-    public UBBParser(List<Token> tokens)
+    public UBBParser(IEnumerable<Token> tokens)
     {
-        _tokens = tokens;
+        _tokens = tokens.ToList();
     }
 
     private Token Peek() => _index < _tokens.Count ? _tokens[_index] : new Token(TokenType.EOF, "", -1);
