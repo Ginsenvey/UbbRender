@@ -118,6 +118,47 @@ public class UBBParserTests
         Assert.AreEqual(0, boldNode.Children.Count);
     }
 
+
+
+    [TestMethod]
+    public void Test_MixedText_And_NestedBoldItalic()
+    {
+        // 输入：正常[b]加粗[i]加粗斜体[/i]加粗[/b]正常
+        string input = "正常[b]加粗[i]加粗斜体[/i]加粗[/b]正常";
+        var doc = GetAst(input);
+        var children = doc.AllNodes;
+
+        // 1. 根节点应该有 3 个直接子节点：[Text, BoldTag, Text]
+        Assert.AreEqual(3, children.Count);
+
+        // 检查第一个节点： "正常"
+        Assert.IsInstanceOfType(children[0], typeof(TextNode));
+        Assert.AreEqual("正常", ((TextNode)children[0]).Content);
+
+        // 2. 检查第二个节点： [b]...[/b]
+        var boldNode = children[1] as TagNode;
+        Assert.IsNotNull(boldNode);
+        Assert.AreEqual(UbbNodeType.Bold, boldNode.Type);
+
+        // [b] 内部应该有 3 个子节点：["加粗", ItalicTag, "加粗"]
+        Assert.AreEqual(3, boldNode.Children.Count);
+        Assert.AreEqual("加粗", ((TextNode)boldNode.Children[0]).Content);
+        Assert.AreEqual("加粗", ((TextNode)boldNode.Children[2]).Content);
+
+        // 3. 检查 [b] 内部嵌套的 [i]...[/i]
+        var italicNode = boldNode.Children[1] as TagNode;
+        Assert.IsNotNull(italicNode);
+        Assert.AreEqual(UbbNodeType.Italic, italicNode.Type);
+
+        // [i] 内部应该有 1 个子节点：["加粗斜体"]
+        Assert.AreEqual(1, italicNode.Children.Count);
+        Assert.AreEqual("加粗斜体", ((TextNode)italicNode.Children[0]).Content);
+
+        // 4. 检查最后一个节点： "正常"
+        Assert.IsInstanceOfType(children[2], typeof(TextNode));
+        Assert.AreEqual("正常", ((TextNode)children[2]).Content);
+    }
+
     #endregion
 
     // 辅助映射逻辑验证（如果 MapToNodeType 是私有的，可通过反射或改为 internal）
