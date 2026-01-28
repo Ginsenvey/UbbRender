@@ -1,4 +1,4 @@
-﻿namespace UbbParser;
+﻿namespace UBBParser.Scanner;
 
 public class UBBScanner(string input)
 {

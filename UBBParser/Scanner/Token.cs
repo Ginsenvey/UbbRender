@@ -1,4 +1,6 @@
-﻿namespace UbbParser;
+﻿using System.Collections.Generic;
+
+namespace UBBParser.Scanner;
 
 public class Token
 {
@@ -14,3 +16,5 @@ public class Token
         Position = position;
     }
 }
+
+
