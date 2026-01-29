@@ -1,4 +1,4 @@
-﻿using UBBParser.Scanner;
+using UBBParser.Scanner;
 
 namespace UBBParser.Parser;
 
@@ -26,42 +26,63 @@ public class UBBParser
 
     /// <param name="parent">当前父节点</param>
     /// <param name="closingTag">期望遇到的闭合标签名，为 null 则解析到 EOF</param>
-    private void ParseContent(UbbNode parent, string closingTag = null)
+    private void ParseContent(UbbNode parent, UbbNodeType? closingTag)
     {
         while (_index < _tokens.Count)
         {
             var token = Peek();
 
-            // 处理闭合标签 [/tag]
+            // 检查是否遇到了闭合标签 [/xxx]
             if (token.Type == TokenType.LeftBracket && PeekNext()?.Type == TokenType.Slash)
             {
-                var nextTag = PeekOffset(2);
-                if (nextTag != null && closingTag != null &&
-                    nextTag.Value.Equals(closingTag, StringComparison.OrdinalIgnoreCase))
+                var nextTagNameToken = PeekOffset(2);
+                if (nextTagNameToken?.Type == TokenType.TagName)
                 {
-                    // 消耗掉 [/tag] 全套 token
-                    Consume(); // [
-                    Consume(); // /
-                    Consume(); // tagName
-                    if (Peek().Type == TokenType.RightBracket) Consume(); // ]
-                    return; // 匹配成功，返回上层递归
+                    string foundClosingName = nextTagNameToken.Value;
+
+                    // 情况 A: 正好是当前正在等待的闭合标签 (如在 [i] 中找到了 [/i])
+                    if (closingTag != null && closingTag== MapToNodeType(foundClosingName))
+                    {
+                        Consume(); // [
+                        Consume(); // /
+                        Consume(); // TagName
+                        if (Peek().Type == TokenType.RightBracket) Consume(); // ]
+                        return; // 正常结束当前标签的内容解析
+                    }
+
+                    // 情况 B: 这是一个闭合标签，但不匹配当前标签 (如在 [i] 中找到了 [/b])
+                    if (closingTag != null)
+                    {
+                        // 检查这是否是一个“合法”的闭合标签（在全局枚举中存在）
+                        // 如果是其他层的标签，我们直接退出，不消费 Token，让上层去匹配它
+                        if (IsKnownTagName(foundClosingName))
+                        {
+                            return;
+                        }
+                    }
                 }
             }
 
-            // 解析一个原子元素并加入父节点
+            // 正常解析元素
             var node = ParseElement();
             if (node != null)
             {
                 parent.AddChild(node);
-                // 如果是需要闭合的标签节点，则开启递归
+
+                // 递归向下
                 if (node is TagNode tag && !IsSelfClosing(tag.Type))
                 {
-                    ParseContent(tag, GetTagNameFromType(tag.Type));
+                    ParseContent(tag, tag.Type);
                 }
             }
         }
     }
 
+    // 新增辅助方法：判断是否是已定义的 UBB 标签
+    private bool IsKnownTagName(string name)
+    {
+        return MapToNodeType(name) != UbbNodeType.Text;
+    }
     private UbbNode ParseElement()
     {
         var token = Consume();
@@ -120,10 +141,16 @@ public class UBBParser
     private Token PeekNext() => PeekOffset(1);
     private Token PeekOffset(int offset) => (_index + offset < _tokens.Count) ? _tokens[_index + offset] : null;
 
-    private bool IsSelfClosing(UbbNodeType type) =>
-        type is UbbNodeType.LineBreak or UbbNodeType.Divider or UbbNodeType.Emoji or UbbNodeType.Image;
-
-    private string GetTagNameFromType(UbbNodeType type) => type.ToString().ToLower();
+    private bool IsSelfClosing(UbbNodeType type)
+    {
+        return type switch
+        {
+            UbbNodeType.Divider => true, // [hr]
+            UbbNodeType.LineBreak => true, // [br]
+            UbbNodeType.Emoji => true, // [ac01]
+            _ => false
+        };
+    }
 
     private UbbNodeType MapToNodeType(string tagName)
     {
@@ -138,15 +165,24 @@ public class UBBParser
             "i" => UbbNodeType.Italic,
             "u" => UbbNodeType.Underline,
             "del" => UbbNodeType.Strikethrough,
+            "size" => UbbNodeType.Size,
+            "font" => UbbNodeType.Font,
+            "color" => UbbNodeType.Color,
             "url" => UbbNodeType.Url,
             "img" => UbbNodeType.Image,
-            "hr" => UbbNodeType.Divider,
-            "br" => UbbNodeType.LineBreak,
+            "audio"=>UbbNodeType.Audio,
+            "video"=>UbbNodeType.Video,
             "code" => UbbNodeType.Code,
             "quote" => UbbNodeType.Quote,
+            "align" => UbbNodeType.Align,
+            "left" => UbbNodeType.Left,
+            "right"=>UbbNodeType.Right,
             "list" => UbbNodeType.List,
-            "*" => UbbNodeType.ListItem,
-            "bilibili" => UbbNodeType.Bilibili,
+            "*"=> UbbNodeType.ListItem,
+            "hr" => UbbNodeType.Divider,
+            "br" => UbbNodeType.LineBreak,
+            "math"=>UbbNodeType.Latex,
+            "bili" => UbbNodeType.Bilibili,
             _ => UbbNodeType.Text
         };
     }
