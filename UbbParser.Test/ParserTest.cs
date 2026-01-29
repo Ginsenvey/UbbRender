@@ -1,4 +1,4 @@
-﻿using UBBParser.Parser;
+using UBBParser.Parser;
 using UBBParser.Scanner;
 
 namespace UbbParser.Test;
@@ -126,7 +126,7 @@ public class UBBParserTests
         // 输入：正常[b]加粗[i]加粗斜体[/i]加粗[/b]正常
         string input = "正常[b]加粗[i]加粗斜体[/i]加粗[/b]正常";
         var doc = GetAst(input);
-        var children = doc.AllNodes;
+        var children = doc.Root.Children;
 
         // 1. 根节点应该有 3 个直接子节点：[Text, BoldTag, Text]
         Assert.AreEqual(3, children.Count);
