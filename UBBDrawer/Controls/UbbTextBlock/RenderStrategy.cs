@@ -20,6 +20,8 @@ using Windows.UI;
 using Windows.UI.Text;
 using static System.Net.WebRequestMethods;
 using LatexRender.Render;
+using UBBParser.Parser;
+
 namespace UbbRender.Common;
 
 
@@ -664,7 +666,7 @@ public class LineBreakRenderStrategy : IRenderStrategy
         // 分析兄弟节点关系
         if (node.Parent != null)
         {
-            var siblings = node.Parent.Children;
+            var siblings = node.Parent.Children.ToList();
             var index = siblings.IndexOf(node);
 
             context.IsFirstInParent = index == 0;
@@ -744,7 +746,7 @@ public class LineBreakRenderStrategy : IRenderStrategy
         if (node.Parent == null)
             return 1;
             
-        var siblings = node.Parent.Children;
+        var siblings = node.Parent.Children.ToList();
         var index = siblings.IndexOf(node);
         int count = 1;
         
