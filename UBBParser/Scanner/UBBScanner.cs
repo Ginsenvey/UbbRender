@@ -28,6 +28,10 @@ public class UBBScanner(string input)
                 {
                     token = ScanMathDelimiter();
                 }
+                else if (c == '\n' || c == '\r')
+                {
+                    token = ScanEnter();
+                }
                 else
                 {
                     token = ScanText();
@@ -97,13 +101,30 @@ public class UBBScanner(string input)
     private Token ScanText()
     {
         int start = _pos;
-        while (_pos < _input.Length && Peek() != '[' && Peek() != '$')
+        while (_pos < _input.Length && Peek() != '[' && Peek() != '$' && Peek() != '\n' && Peek() != '\r')
         {
             Advance();
         }
         return new Token(TokenType.Text, _input[start.._pos], start);
     }
+    // 新增：专门处理换行符的方法
+    private Token ScanEnter()
+    {
+        int start = _pos;
+        char c = Peek();
 
+        // 处理 \r\n 组合（Windows风格换行）
+        if (c == '\r' && _pos + 1 < _input.Length && _input[_pos + 1] == '\n')
+        {
+            Advance(); // 消费 \r
+            Advance(); // 消费 \n
+            return new Token(TokenType.Enter, "\r\n", start);
+        }
+
+        // 处理单独的 \n 或 \r
+        Advance();
+        return new Token(TokenType.Enter, c.ToString(), start);
+    }
     private Token ScanMathDelimiter()
     {
         int start = _pos;

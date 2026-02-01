@@ -55,6 +55,11 @@ public class UBBParser
             if (node != null)
             {
                 parent.AddChild(node);
+                //不存在子节点，跳过
+                if (node.Type==UbbNodeType.LineBreak)
+                {
+                    continue;
+                }
 
                 if (node is TagNode tag && !IsSelfClosing(tag.Type))
                 {
@@ -86,7 +91,9 @@ public class UBBParser
             case TokenType.Text:
                 Consume();
                 return new TextNode(token.Value);
-
+            case TokenType.Enter:
+                Consume();
+                return TagNode.Create(UbbNodeType.LineBreak); 
             case TokenType.Dollar:
             case TokenType.DoubleDollar:
                 return ParseLatex();
@@ -153,7 +160,7 @@ public class UBBParser
                         return FallbackToText(startIndex);
                     }
 
-                    string key = attrCount == 0 ? "default" : attrCount.ToString();
+                    string key = attrCount == 0 ?  GetAttributeName(type): $"value{attrCount}";
                     attributes[key] = valToken.Value;
                     attrCount++;
                 }
@@ -184,6 +191,20 @@ public class UBBParser
         // 到达 EOF 仍未闭合，回退
         return FallbackToText(startIndex);
     }
+    public string GetAttributeName(UbbNodeType type)=>type switch
+    {
+        UbbNodeType.Size=>"size",
+        UbbNodeType.Font=>"font",
+        UbbNodeType.Color=>"color",
+        UbbNodeType.Url=>"href",
+        UbbNodeType.Image=>"src",
+        UbbNodeType.Audio=>"src",
+        UbbNodeType.Video=>"src",
+        UbbNodeType.Code=>"language",
+        UbbNodeType.Quote=>"author",
+        UbbNodeType.Emoji=>"code",
+        _ => "value"
+    };
     private void ParseVerbatimContent(TagNode parent)
     {
         var sb = new System.Text.StringBuilder();
@@ -296,12 +317,13 @@ public class UBBParser
             "list" => UbbNodeType.List,
             "*"=> UbbNodeType.ListItem,
             "hr" => UbbNodeType.Divider,
+            "line"=>UbbNodeType.Divider,
             "br" => UbbNodeType.LineBreak,
             "math"=>UbbNodeType.Latex,
             "bili" => UbbNodeType.Bilibili,
             "upload" =>UbbNodeType.Upload,
             "noubb" => UbbNodeType.NoUBB,
-            "markdown"=>UbbNodeType.Markdown,
+            "md"=>UbbNodeType.Markdown,
             "replyview"=>UbbNodeType.ReplyView,
             "needreply"=>UbbNodeType.NeedReply,
             _ => UbbNodeType.Text

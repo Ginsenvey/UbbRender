@@ -21,6 +21,8 @@ using Windows.UI.Text;
 using static System.Net.WebRequestMethods;
 using LatexRender.Render;
 using UBBParser.Parser;
+using Microsoft.UI.Xaml.Shapes;
+using CommunityToolkit.WinUI.UI.Controls;
 
 namespace UbbRender.Common;
 
@@ -299,7 +301,7 @@ public class CodeRenderStrategy : IRenderStrategy
         {
             Background = (Brush)context.Properties["CodeBackground"],
             Padding = new Thickness(12),
-            Margin = new Thickness(4, 2, 2, 0),
+            Margin = new Thickness(4, 2, 4, 2),
             CornerRadius = new CornerRadius(4)
         };
 
@@ -316,13 +318,22 @@ public class CodeRenderStrategy : IRenderStrategy
         };
 
         // 获取语言名称
-        var languageName = node is TagNode tagNode ? tagNode.GetAttribute("language") : "cpp";
+        var languageName = node is TagNode tagNode ? tagNode.GetAttribute("language") : "PlainText";
         if (string.IsNullOrEmpty(languageName))
-            languageName = "cpp";
-
+            languageName = "PlainText";
+        string displayName = string.Empty;
+        var language = ColorCode.Languages.Cpp;
         // 获取友好的语言显示名称
-        var language = ColorCode.Languages.FindById(languageName) ?? ColorCode.Languages.Cpp;
-        var displayName = GetLanguageDisplayName(language, languageName);
+        if (languageName == "PlainText")
+        {
+            displayName = languageName;
+        }
+        else
+        {
+            language = ColorCode.Languages.FindById(languageName) ?? ColorCode.Languages.Cpp;
+            displayName = GetLanguageDisplayName(language, languageName);
+        }
+            
 
         // 创建语言标签
         var languageTag = new Border
@@ -339,9 +350,8 @@ public class CodeRenderStrategy : IRenderStrategy
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0x7A, 0xCC)), // 蓝色文字
-            VerticalAlignment=VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center
         };
-
         languageTag.Child = languageText;
         languageContainer.Children.Add(languageTag);
 
@@ -366,10 +376,13 @@ public class CodeRenderStrategy : IRenderStrategy
             IsTextSelectionEnabled = true
         };
 
-        var codeText = CollectText(node);
-        var formatter = new RichTextBlockFormatter();
-        formatter.FormatRichTextBlock(codeText, language, textBlock);
-        AddCopyButton(languageContainer, codeText);
+        var codeText =RenderHelper.CollectText(node);
+        if (languageName != "PlainText")
+        {
+            var formatter = new RichTextBlockFormatter();
+            formatter.FormatRichTextBlock(codeText, language, textBlock);
+        }
+        RenderHelper.AddCopyButton(languageContainer, codeText);
         scrollViewer.Content = textBlock;
         codeContainer.Children.Add(scrollViewer);
 
@@ -379,22 +392,7 @@ public class CodeRenderStrategy : IRenderStrategy
         context.AddToContainer(border);
     }
 
-    private string CollectText(UbbNode node)
-    {
-        var text = "";
-        foreach (var child in node.Children)
-        {
-            if (child is TextNode textNode)
-            {
-                text += textNode.Content;
-            }
-            else
-            {
-                text += CollectText(child);
-            }
-        }
-        return text;
-    }
+    
     private string GetLanguageDisplayName(ColorCode.ILanguage language, string languageName)
     {
         // 如果语言对象有 Name 属性，使用它
@@ -430,29 +428,7 @@ public class CodeRenderStrategy : IRenderStrategy
             _ => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(languageName)
         };
     }
-    private void AddCopyButton(Grid languageContainer, string codeText)
-    {
-        var copyButton = new Button
-        {
-            Content = new FluentIcons.WinUI.SymbolIcon { Symbol=FluentIcons.Common.Symbol.Copy,FontSize=16},
-            Margin = new Thickness(0, 0, 8, 0),
-            Padding=new Thickness(0,0,0,0),
-            BorderThickness = new Thickness(1),
-            Width = 32,
-            Height = 32,
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-
-        copyButton.Click += (sender, e) =>
-        {
-            var dataPackage = new DataPackage();
-            dataPackage.SetText(codeText);
-            Clipboard.SetContent(dataPackage);
-
-        };
-
-        languageContainer.Children.Add(copyButton);
-    }
+    
   
 }
 
@@ -796,7 +772,7 @@ public class AlignRenderStrategy : IRenderStrategy
         context.FinalizeCurrentTextBlock();
         if (node is TagNode tagNode)
         {
-            var align = tagNode.GetAttribute("align", "left").ToLower();
+            var align = tagNode.GetAttribute("value", "left").ToLower();
             RenderHelper.ApplyAlignToContext(align,node,context);
         }
     }
@@ -1074,12 +1050,11 @@ public class LatexRenderStrategy : IRenderStrategy
         var textBlock = new LatexBlock
         {
             FontSize = 24,
-            Width=400
         };
 
-        var codeText = CollectText(node);
+        var codeText =RenderHelper.CollectText(node);
         textBlock.LaTeX= codeText;
-        AddCopyButton(languageContainer, codeText);
+        RenderHelper.AddCopyButton(languageContainer, codeText);
         scrollViewer.Content = textBlock;
         codeContainer.Children.Add(scrollViewer);
 
@@ -1089,47 +1064,108 @@ public class LatexRenderStrategy : IRenderStrategy
         context.AddToContainer(border);
     }
 
-    private string CollectText(UbbNode node)
+}
+public class DividerRenderStrategy : IRenderStrategy
+{
+    public void Render(UbbNode node, RenderContext context)
     {
-        var text = "";
-        foreach (var child in node.Children)
+        var border = new Border();
+        var line= new Line
         {
-            if (child is TextNode textNode)
-            {
-                text += textNode.Content;
-            }
-            else
-            {
-                text += CollectText(child);
-            }
-        }
-        return text;
-    }
-    private void AddCopyButton(Grid languageContainer, string codeText)
-    {
-        var copyButton = new Button
-        {
-            Content = new FluentIcons.WinUI.SymbolIcon { Symbol = FluentIcons.Common.Symbol.Copy, FontSize = 16 },
-            Margin = new Thickness(0, 0, 8, 0),
-            Padding = new Thickness(0, 0, 0, 0),
-            BorderThickness = new Thickness(1),
-            Width = 32,
-            Height = 32,
-            HorizontalAlignment = HorizontalAlignment.Right
+            X1 = 0,
+            Y1 = 0,
+            X2 = 1,  // 相对坐标，Stretch.Fill会处理
+            Y2 = 0,
+            Stroke = new SolidColorBrush(Colors.Gray),
+            StrokeThickness = 2,
+            StrokeDashArray = new DoubleCollection { 2, 2 },
+            Stretch = Stretch.Fill,  // 自动拉伸
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(5,10,5,10)
         };
-
-        copyButton.Click += (sender, e) =>
-        {
-            var dataPackage = new DataPackage();
-            dataPackage.SetText(codeText);
-            Clipboard.SetContent(dataPackage);
-        };
-
-        languageContainer.Children.Add(copyButton);
+        border.Child = line;
+        context.AddToContainer(border);
     }
-
 }
 
+public class MarkdownRenderStrategy : IRenderStrategy
+{
+    public void Render(UbbNode node, RenderContext context)
+    {
+        context.FinalizeCurrentTextBlock();
+        var border = new Border
+        {
+            Background = (Brush)context.Properties["CodeBackground"],
+            Padding = new Thickness(12),
+            Margin = new Thickness(4, 2, 2, 0),
+            CornerRadius = new CornerRadius(4)
+        };
+
+        var grid = new Grid();
+
+        // 定义行：第一行用于显示语言标签，第二行用于代码
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        // 创建语言标签容器
+        var languageContainer = new Grid
+        {
+            Margin = new Thickness(0, 0, 0, 0),
+        };
+
+
+        // 创建语言标签
+        var languageTag = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x7A, 0xCC)), // 半透明蓝色
+            Padding = new Thickness(8, 4, 8, 4),
+            CornerRadius = new CornerRadius(4),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+
+        var languageText = new TextBlock
+        {
+            Text = "Markdown",
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0x7A, 0xCC)), // 蓝色文字
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        languageTag.Child = languageText;
+        languageContainer.Children.Add(languageTag);
+
+        // 添加到 Grid 的第一行
+        Grid.SetRow(languageContainer, 0);
+        grid.Children.Add(languageContainer);
+
+        // 2. 创建代码区域
+        var codeContainer = new Grid();
+        Grid.SetRow(codeContainer, 1);
+
+        var scrollViewer = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+
+        var textBlock = new MarkdownTextBlock
+        {
+            FontSize = 14,
+        };
+
+        var codeText = RenderHelper.CollectText(node);
+        textBlock.Text = codeText;
+        RenderHelper.AddCopyButton(languageContainer, codeText);
+        scrollViewer.Content = textBlock;
+        codeContainer.Children.Add(scrollViewer);
+
+        grid.Children.Add(codeContainer);
+
+        border.Child = grid;
+        context.AddToContainer(border);
+    }
+}
 public class RenderHelper
 {
     public static void ApplyAlignToContext(string align,UbbNode node, RenderContext context)
@@ -1186,5 +1222,44 @@ public class RenderHelper
 
         // 将 panel 添加回之前的容器
         context.AddToContainer(panel);
+    }
+
+    public static void AddCopyButton(Grid languageContainer, string codeText)
+    {
+        var copyButton = new Button
+        {
+            Content = new FluentIcons.WinUI.SymbolIcon { Symbol = FluentIcons.Common.Symbol.Copy, FontSize = 16 },
+            Margin = new Thickness(0, 0, 8, 0),
+            Padding = new Thickness(0, 0, 0, 0),
+            BorderThickness = new Thickness(1),
+            Width = 32,
+            Height = 32,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
+        copyButton.Click += (sender, e) =>
+        {
+            var dataPackage = new DataPackage();
+            dataPackage.SetText(codeText);
+            Clipboard.SetContent(dataPackage);
+        };
+
+        languageContainer.Children.Add(copyButton);
+    }
+    public static string CollectText(UbbNode node)
+    {
+        var text = "";
+        foreach (var child in node.Children)
+        {
+            if (child is TextNode textNode)
+            {
+                text += textNode.Content;
+            }
+            else
+            {
+                text += CollectText(child);
+            }
+        }
+        return text;
     }
 }

@@ -155,6 +155,8 @@ namespace UbbRender.Render
                 [UbbNodeType.LineBreak] = new LineBreakRenderStrategy(),
                 [UbbNodeType.Emoji]=new EmojiRenderStrategy(),
                 [UbbNodeType.Latex]=new LatexRenderStrategy(),
+                [UbbNodeType.Divider]=new DividerRenderStrategy(),
+                [UbbNodeType.Markdown]=new MarkdownRenderStrategy()
             };
         }
 
