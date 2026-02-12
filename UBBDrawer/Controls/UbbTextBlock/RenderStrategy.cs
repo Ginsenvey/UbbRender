@@ -1,12 +1,17 @@
-﻿using ColorCode;
-using CommunityToolkit.WinUI.UI.Controls.Markdown.Render;
+﻿using CodeDisplay;
+using ColorCode;
+using CommunityToolkit.WinUI.UI.Controls;
+using LatexRender.Render;
 using Microsoft.UI;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Shapes;
+using MusicPlayerControl;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,14 +20,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using UBBParser.Parser;
+using VideoPlayerControl;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.UI;
 using Windows.UI.Text;
 using static System.Net.WebRequestMethods;
-using LatexRender.Render;
-using UBBParser.Parser;
-using Microsoft.UI.Xaml.Shapes;
-using CommunityToolkit.WinUI.UI.Controls;
 
 namespace UbbRender.Common;
 
@@ -297,99 +300,17 @@ public class CodeRenderStrategy : IRenderStrategy
     public void Render(UbbNode node, RenderContext context)
     {
         context.FinalizeCurrentTextBlock();
-        var border = new Border
-        {
-            Background = (Brush)context.Properties["CodeBackground"],
-            Padding = new Thickness(12),
-            Margin = new Thickness(4, 2, 4, 2),
-            CornerRadius = new CornerRadius(4)
-        };
-
-        var grid = new Grid();
-
-        // 定义行：第一行用于显示语言标签，第二行用于代码
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-        // 创建语言标签容器
-        var languageContainer = new Grid
-        {
-            Margin = new Thickness(0, 0, 0, 0),
-        };
-
-        // 获取语言名称
         var languageName = node is TagNode tagNode ? tagNode.GetAttribute("language") : "PlainText";
-        if (string.IsNullOrEmpty(languageName))
-            languageName = "PlainText";
-        string displayName = string.Empty;
-        var language = ColorCode.Languages.Cpp;
-        // 获取友好的语言显示名称
-        if (languageName == "PlainText")
+        var viewer = new CodeBlock
         {
-            displayName = languageName;
-        }
-        else
-        {
-            language = ColorCode.Languages.FindById(languageName) ?? ColorCode.Languages.Cpp;
-            displayName = GetLanguageDisplayName(language, languageName);
-        }
-            
-
-        // 创建语言标签
-        var languageTag = new Border
-        {
-            Background = new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x7A, 0xCC)), // 半透明蓝色
-            Padding = new Thickness(8, 4, 8, 4),
-            CornerRadius = new CornerRadius(4),
-            HorizontalAlignment = HorizontalAlignment.Left
+            LanguageName = languageName,
+            Code = RenderHelper.CollectText(node),
+            Background= (Brush)context.Properties["CodeBackground"],
+            Padding =new Thickness(12),
+            Margin=new Thickness(4,2,4,2),
+            CornerRadius=new CornerRadius(4),
         };
-
-        var languageText = new TextBlock
-        {
-            Text = displayName,
-            FontSize = 12,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0x7A, 0xCC)), // 蓝色文字
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        languageTag.Child = languageText;
-        languageContainer.Children.Add(languageTag);
-
-        // 添加到 Grid 的第一行
-        Grid.SetRow(languageContainer, 0);
-        grid.Children.Add(languageContainer);
-
-        // 2. 创建代码区域
-        var codeContainer = new Grid();
-        Grid.SetRow(codeContainer, 1);
-
-        var scrollViewer = new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-        };
-
-        var textBlock = new RichTextBlock
-        {
-            FontFamily = new FontFamily("Consolas, 'Cascadia Code', monospace"),
-            FontSize = (double)context.Properties["FontSize"] * 0.9,
-            IsTextSelectionEnabled = true
-        };
-
-        var codeText =RenderHelper.CollectText(node);
-        if (languageName != "PlainText")
-        {
-            var formatter = new RichTextBlockFormatter();
-            formatter.FormatRichTextBlock(codeText, language, textBlock);
-        }
-        RenderHelper.AddCopyButton(languageContainer, codeText);
-        scrollViewer.Content = textBlock;
-        codeContainer.Children.Add(scrollViewer);
-
-        grid.Children.Add(codeContainer);
-
-        border.Child = grid;
-        context.AddToContainer(border);
+        context.AddToContainer(viewer);
     }
 
     
@@ -1261,5 +1182,302 @@ public class RenderHelper
             }
         }
         return text;
+    }
+}
+
+public class FlatQuoteRenderStrategy : IRenderStrategy
+{
+    private const int MaxVisibleDepth = 2;
+
+    public void Render(UbbNode node, RenderContext context)
+    {
+        context.FinalizeCurrentTextBlock();
+
+        // 提取引用链（所有层级）
+        var quoteChain = ExtractQuoteChain(node);
+
+        if (quoteChain.Count == 0) return;
+
+        // 创建主容器
+        var mainContainer = CreateQuoteContainer(context, quoteChain);
+
+        // 添加到渲染上下文
+        context.AddToContainer(mainContainer);
+    }
+
+    // 提取所有引用层级
+    private List<UbbNode> ExtractQuoteChain(UbbNode node)
+    {
+        var chain = new List<UbbNode>();
+        ExtractAllQuotes(node, chain);
+        return chain;
+    }
+
+    private void ExtractAllQuotes(UbbNode node, List<UbbNode> chain)
+    {
+        if (node.Type == UbbNodeType.Quote)
+        {
+            chain.Add(node);
+
+            // 查找所有直接子引用
+            foreach (var child in node.Children)
+            {
+                if (child.Type == UbbNodeType.Quote)
+                {
+                    ExtractAllQuotes(child, chain);
+                }
+            }
+        }
+    }
+
+    // 创建引用容器
+    private FrameworkElement CreateQuoteContainer(RenderContext context, List<UbbNode> quoteChain)
+    {
+        // 判断是否需要折叠
+        bool needCollapse = quoteChain.Count > MaxVisibleDepth;
+        int visibleCount = Math.Min(quoteChain.Count, MaxVisibleDepth);
+
+        var container = new StackPanel
+        {
+            Spacing = 0,
+            Margin = new Thickness(0)
+        };
+
+        // 如果需要折叠
+        if (needCollapse)
+        {
+            // 创建折叠部分（第3层及以后）
+            var collapsedSection = CreateCollapsedSection(
+                quoteChain.Skip(MaxVisibleDepth).ToList(),
+                context
+            );
+            container.Children.Add(collapsedSection);
+
+            // 在按钮和下方内容之间添加分割线
+            container.Children.Add(CreateSeparator());
+        }
+
+        // 添加可见部分（前两层）
+        for (int i = visibleCount - 1; i >= 0; i--)
+        {
+            // 渲染单个引用
+            var quoteContainer = RenderSingleQuote(quoteChain[i], context, i == 0);
+            container.Children.Add(quoteContainer);
+
+            // 在引用之间添加分割线（除了最后一个）
+            if (i > 0)
+            {
+                container.Children.Add(CreateSeparator());
+            }
+        }
+
+        // 添加外部边框
+        return new Border
+        {
+            Background = (Brush)context.Properties["QuoteBackground"] ?? new SolidColorBrush(Color.FromArgb(255, 232, 244, 249)),
+            Padding = new Thickness(12, 8, 12, 8),
+            Margin = new Thickness(0, 8, 0, 8),
+            CornerRadius = new CornerRadius(4),
+            Child = container
+        };
+    }
+
+    // 创建折叠部分
+    private FrameworkElement CreateCollapsedSection(List<UbbNode> collapsedQuotes, RenderContext context)
+    {
+        var section = new StackPanel
+        {
+            Spacing = 4
+        };
+
+        // 创建展开按钮
+        var expandButton = new ToggleButton
+        {
+            Content = $"展开{collapsedQuotes.Count}条引用",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 0),
+            Padding = new Thickness(12, 6, 12, 6),
+            FontSize = 12,
+            CornerRadius = new CornerRadius(4),
+            IsChecked = false
+        };
+
+        // 创建折叠内容容器
+        var collapsedContent = new StackPanel
+        {
+            Visibility = Visibility.Collapsed,
+            Spacing = 8,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+
+        // 添加折叠的引用（按从深到浅的顺序）
+        for (int i = collapsedQuotes.Count - 1; i >= 0; i--)
+        {
+            var quoteContainer = RenderSingleQuote(collapsedQuotes[i], context, false);
+            collapsedContent.Children.Add(quoteContainer);
+
+            // 在折叠的引用之间也添加分割线
+            if (i > 0)
+            {
+                collapsedContent.Children.Add(CreateSeparator());
+            }
+        }
+
+        // 按钮点击事件
+        expandButton.Click += (sender, e) =>
+        {
+            ToggleCollapsedContent(expandButton, collapsedContent, collapsedQuotes.Count, context.Control);
+        };
+
+        section.Children.Add(expandButton);
+        section.Children.Add(collapsedContent);
+
+        return section;
+    }
+
+    // 切换折叠状态
+    private void ToggleCollapsedContent(ToggleButton button, StackPanel content, int quoteCount, Control control)
+    {
+        if (content.Visibility == Visibility.Collapsed)
+        {
+            button.IsChecked = true;
+            content.Visibility = Visibility.Visible;
+            button.Content = "收起引用";
+        }
+        else
+        {
+            button.IsChecked = false;
+            content.Visibility = Visibility.Collapsed;
+            button.Content = $"展开{quoteCount}条引用";
+        }
+    }
+
+
+    // 创建分割线
+    private Border CreateSeparator()
+    {
+        return new Border
+        {
+            Height = 1,
+            Background = new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x00, 0x00)),
+            Margin = new Thickness(0, 5, 0, 5),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+    }
+
+    // 渲染单个引用
+    private FrameworkElement RenderSingleQuote(UbbNode quoteNode, RenderContext context, bool isFirstLevel)
+    {
+        var contentPanel = new StackPanel
+        {
+            Spacing = 4,
+            Margin = new Thickness(0)
+        };
+
+        // 创建临时渲染上下文，确保复制 Control
+        var tempContext = new RenderContext
+        {
+            Control = context.Control, // 关键：复制 Control 引用
+            Container = contentPanel,
+            Properties = context.Properties,
+            PanelStack = new Stack<Panel>(),
+            QuoteNestingLevel = context.QuoteNestingLevel
+        };
+
+        // 渲染引用内容（跳过嵌套的引用，因为它们已经被提取出来了）
+        RenderQuoteContent(quoteNode, tempContext);
+
+        // 添加左侧边框作为视觉指示
+        return new Border
+        {
+            Background = new SolidColorBrush(Colors.Transparent),
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = new Thickness(0, 2, 0, 2),
+            Child = contentPanel
+        };
+    }
+
+    // 渲染引用内容（跳过嵌套引用）
+    private void RenderQuoteContent(UbbNode node, RenderContext context)
+    {
+        foreach (var child in node.Children)
+        {
+            // 跳过嵌套的引用节点（它们已经被提取出来单独渲染）
+            if (child.Type != UbbNodeType.Quote)
+            {
+                context.RenderNode(child);
+            }
+        }
+
+        context.FinalizeCurrentTextBlock();
+    }
+}
+public class AudioRenderStrategy : IRenderStrategy
+{
+    public void Render(UbbNode node, RenderContext context)
+    {
+        if (node is TagNode tagNode)
+        {
+            var src = tagNode.GetAttribute("src");
+            if (string.IsNullOrEmpty(src))
+            {
+                // 尝试从子节点获取URL
+                foreach (var child in node.Children)
+                {
+                    if (child is TextNode textNode)
+                    {
+                        src = textNode.Content;
+                        break;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(src))
+            {
+                var player = new MusicPlayer
+                {
+                    Title = "测试音频",
+                    Src = src,
+                    Margin = new Thickness(10),
+                };
+
+                context.AddToContainer(player);
+            }
+        }
+    }
+}
+
+public class VideoRenderStrategy : IRenderStrategy
+{
+    public void Render(UbbNode node, RenderContext context)
+    {
+        if (node is TagNode tagNode)
+        {
+            var src = tagNode.GetAttribute("src");
+            if (string.IsNullOrEmpty(src))
+            {
+                // 尝试从子节点获取URL
+                foreach (var child in node.Children)
+                {
+                    if (child is TextNode textNode)
+                    {
+                        src = textNode.Content;
+                        break;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(src))
+            {
+                var player = new VideoPlayer
+                {
+                    Src = src,
+                    Margin = new Thickness(10),
+                    AutoPlay = false,
+                };
+
+                context.AddToContainer(player);
+            }
+        }
     }
 }

@@ -26,7 +26,7 @@
         </Grid.ColumnDefinitions>
         <TextBox x:Name="i" Grid.Row="0" Grid.Column="1" TextChanged="in_TextChanged"  AcceptsReturn="True" TextWrapping="Wrap"></TextBox>
         <ScrollViewer Grid.Row="1" Grid.Column="1" Visibility="Visible">
-            <cc:UbbTextBlock x:Name="render" CodeBackground="{ThemeResource MarkdownBackgroudBrush}"></cc:UbbTextBlock>
+            <cc:UbbTextBlock x:Name="render" Foreground="{ThemeResource TextFillColorSecondaryBrush}"></cc:UbbTextBlock>
         </ScrollViewer>
         <TreeView x:Name="view" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" >
             <TreeView.Resources>

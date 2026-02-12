@@ -12,6 +12,9 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Controls\CodeBlock.xaml" />
+  </ItemGroup>
 
   <ItemGroup>
     <Content Include="Assets\SplashScreen.scale-200.png" />
@@ -52,6 +55,11 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\UBBParser\UBBParser.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Update="Controls\CodeBlock.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
 
   <!--
