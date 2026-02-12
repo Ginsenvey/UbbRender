@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UBBParser.Parser;
 
 namespace UBBDrawer;
 public class UbbTreeItem:ObservableObject
@@ -195,7 +196,7 @@ public static class UbbTreeConverter
         // 如果有属性，添加属性信息
         if (node is TagNode tagNode && tagNode.Attributes.Count > 0)
         {
-            treeItem.Attributes = tagNode.Attributes;
+            treeItem.Attributes = new Dictionary<string, string>(tagNode.Attributes);
 
             // 根据标签类型显示特定的属性
             var attributeInfo = "";

@@ -50,6 +50,9 @@
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
     <PackageReference Include="SkiaSharp.Views.WinUI" Version="3.119.1" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\UBBParser\UBBParser.csproj" />
+  </ItemGroup>
 
   <!--
     Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
